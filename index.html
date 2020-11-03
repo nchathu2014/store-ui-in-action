@@ -143,7 +143,15 @@
 
         // Listen to the store changes
         store.subscribe(() => {
-            console.log('The new state is: ', store.getState())
+            const { goals, todos } = store.getState()
+
+            document.getElementById('goals').innerHTML = ''
+            document.getElementById('todos').innerHTML = ''
+
+            goals.forEach(addGoalToDOM)
+            todos.forEach(addTodoToDOM)
+
+
         });
 
 
@@ -162,6 +170,13 @@
             name.value = ""
         };
 
+        function createRemoveButton (onClick) {
+            const removeBtn = document.createElement('button')
+            removeBtn.innerHTML = 'X'
+            removeBtn.addEventListener('click', onClick)
+            return removeBtn
+        }
+
 
         addGoal = () => {
             let goal = document.querySelector("#goal");
@@ -172,6 +187,44 @@
             }));
 
             goal.value = "";
+        };
+
+        addTodoToDOM = (todo) => {
+
+            const node = document.createElement('li')
+            const text = document.createTextNode(todo.input)
+
+            const removeBtn = createRemoveButton(() => {
+                store.dispatch(removeTodoAction(todo.id))
+            })
+
+
+            node.appendChild(text)
+            node.appendChild(removeBtn)
+            node.style.textDecoration = todo.complete ? 'line-through' : 'none';
+            node.addEventListener('click', () => {
+                store.dispatch(toggleTodoAction(todo.id))
+            })
+
+            document.getElementById('todos')
+                .appendChild(node)
+        };
+
+        function addGoalToDOM (goal) {
+
+            const node = document.createElement('li')
+            const text = document.createTextNode(goal.goal)
+
+
+
+            const removeBtn = createRemoveButton(() => {
+                store.dispatch(removeGoalAction(goal.id))
+            })
+            node.appendChild(text)
+            node.appendChild(removeBtn)
+
+            document.getElementById('goals')
+                .append(node)
         }
 
 
@@ -181,14 +234,14 @@
 <div>
     <h1>ToDo List</h1>
     <input type="text" id="todo" placeholder="Add ToDo"/>
-    <button id="todoBtn" onClick="addTodo()">Add ToDo</button>
+    <button id="todoBtn" onclick="addTodo()">Add ToDo</button>
     <ul id="todos"></ul>
 </div>
 
 <div>
     <h1>Goals</h1>
     <input type="text" id="goal" placeholder="Add Goal"/>
-    <button id="goalBtn" onClick="addGoal()">Add Goal</button>
+    <button id="goalBtn" onclick="addGoal()">Add Goal</button>
     <ul id="goals"></ul>
 </div>
 </body>
