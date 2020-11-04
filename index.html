@@ -97,16 +97,11 @@
             }
         }
 
-        //Root Reducer
-        function app(state = {}, action) {
-            return {
-                todos: todos(state.todos, action),
-                goals: goals(state.goals, action),
-            }
-        }
-
         //Store creation
-        const store = Redux.createStore(app);
+        const store = Redux.createStore(Redux.combineReducers({
+            todos,
+            goals,
+        }));
 
         // Listen to the store changes
         store.subscribe(() => {
