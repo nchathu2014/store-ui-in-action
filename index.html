@@ -23,26 +23,57 @@
             return Math.random().toString(36).substring(2) + (new Date()).getTime().toString(36);
         }
 
-        //Custom middleware
-        function checker(store){
-            return function(next){
-                return function(action){
-                    if(action.type === 'ADD_TODO' &&
-                        action.todo.input.toLocaleLowerCase().includes('bit coin')){
-                        return alert('bad idea');
-                    }
+        //Custom middleware: currying pattern function
 
-                    if(action.type === 'ADD_GOAL' &&
-                        action.goal.goal.toLocaleLowerCase().includes('bit coin')){
-                        console.log('GOAL',action.goal)
-                        return alert('bad idea');
-                    }
-
-                    return next(action);
-                }
+       const checker = (store) => (next) => (action) =>{
+            if(action.type === 'ADD_TODO' &&
+                action.todo.input.toLocaleLowerCase().includes('bit coin')){
+                return alert('bad idea');
             }
-        }
 
+            if(action.type === 'ADD_GOAL' &&
+                action.goal.goal.toLocaleLowerCase().includes('bit coin')){
+                console.log('GOAL',action.goal);
+                return alert('bad idea');
+            }
+
+            return next(action);
+        };
+
+        /**
+         * Logger middleware
+         * */
+        const logger = (store) => (next) => (action) => {
+
+           console.group(action.type)
+            console.log('The action: ',action);
+            const result = next(action);
+            console.log('The new state: ',store.getState());
+           console.groupEnd();
+
+            return result;
+        };
+
+
+        //goal middleware
+        const goal = (store) => (next) => (action) => {
+
+            if(action.type === 'ADD_GOAL'){
+                alert("That's a great goal!");
+            }
+
+            return next(action);
+        } ;
+
+        // dontforget middleware
+
+        const dontforget = (store) => (next) => (action) => {
+          if(action.type === 'ADD_TODO'){
+              alert(`Don't forget to ${action.todo.input}`);
+          }
+
+          next(action);
+        };
 
         /**
          * Action Creators: todo
@@ -122,7 +153,7 @@
         const store = Redux.createStore(Redux.combineReducers({
             todos,
             goals,
-        }),Redux.applyMiddleware(checker));
+        }),Redux.applyMiddleware(checker,logger,goal,dontforget));
 
         // Listen to the store changes
         store.subscribe(() => {
