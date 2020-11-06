@@ -10,6 +10,7 @@
     <script src="https://unpkg.com/react-dom@16.3.0-alpha.1/umd/react-dom.development.js"></script>
     <script src="https://unpkg.com/babel-standalone@6.15.0/babel.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/redux/3.7.2/redux.min.js"></script>
+    <script src="https://tylermcginnis.com/goals-todos-api/index.js"></script>
     <script>
 
         // Action types
@@ -18,6 +19,7 @@
         const TOGGLE_TODO = 'TOGGLE_TODO';
         const ADD_GOAL = 'ADD_GOAL';
         const REMOVE_GOAL = 'REMOVE_GOAL';
+        const RECEIVE_DATA = "RECEIVE_DATA";
 
         /**
          * Util function
@@ -30,12 +32,12 @@
 
         const checker = (store) => (next) => (action) => {
             if (action.type === 'ADD_TODO' &&
-                action.todo.input.toLowerCase().includes('bit coin')) {
+                action.todo.name.toLowerCase().includes('bit coin')) {
                 return alert('bad idea');
             }
 
             if (action.type === 'ADD_GOAL' &&
-                action.goal.input.toLowerCase().includes('bit coin')) {
+                action.goal.name.toLowerCase().includes('bit coin')) {
                 console.log('GOAL', action.goal);
                 return alert('bad idea');
             }
@@ -72,7 +74,7 @@
 
         const dontforget = (store) => (next) => (action) => {
             if (action.type === 'ADD_TODO') {
-                alert(`Don't forget to ${action.todo.input}`);
+                alert(`Don't forget to ${action.todo.name}`);
             }
 
             next(action);
@@ -99,6 +101,15 @@
             return {
                 type: TOGGLE_TODO,
                 id,
+            }
+        }
+
+        function receiveDataAction(todos,goals){
+            return{
+                type:RECEIVE_DATA,
+                todos,
+                goals
+
             }
         }
 
@@ -129,10 +140,12 @@
                 case ADD_TODO :
                     return state.concat([action.todo])
                 case REMOVE_TODO :
-                    return state.filter((todo) => todo.id !== action.id)
+                    return state.filter((todo) => todo.id !== action.id);
                 case TOGGLE_TODO :
                     return state.map((todo) => todo.id !== action.id ? todo :
-                        Object.assign({}, todo, {complete: !todo.complete}))
+                        Object.assign({}, todo, {complete: !todo.complete}));
+                case RECEIVE_DATA:
+                    return action.todos;
                 default :
                     return state
             }
@@ -144,19 +157,37 @@
         function goals(state = [], action) {
             switch (action.type) {
                 case ADD_GOAL :
-                    return state.concat([action.goal])
+                    return state.concat([action.goal]);
                 case REMOVE_GOAL :
-                    return state.filter((goal) => goal.id !== action.id)
+                    return state.filter((goal) => goal.id !== action.id);
+                case RECEIVE_DATA:
+                    return action.goals;
                 default :
                     return state
             }
         }
+
+        /**
+         * Reducer loading
+         */
+        function loading(state=true,action){
+
+            switch(action.type){
+                case RECEIVE_DATA:
+                    return false;
+                default:
+                    return state;
+            }
+
+        }
+
 
         //Store creation
         const store = Redux.createStore(
             Redux.combineReducers({
                 todos,
                 goals,
+                loading,
             }),
             Redux.applyMiddleware(checker, logger, goal, dontforget)
         );
@@ -181,16 +212,39 @@
 <script type="text/babel">
     class App extends React.Component {
 
-        componentDidMount() {
-            const {store} = this.props;
-            store.subscribe(() => {
-                this.forceUpdate();
-            });
+       componentDidMount() {
+            const {fetchTodos, fetchGoals,} = API;
+           const {store} = this.props;
+
+          try{
+              Promise.all([fetchTodos(),fetchGoals()])
+                  .then(([todos,goals])=>{
+                      store.dispatch(receiveDataAction(todos,goals));
+                      this.setState({
+                          isLoader:false
+                      })
+                  });
+
+          }catch(error){
+              console.log(error);
+          }
+
+           store.subscribe(() => this.forceUpdate());
         }
 
         render() {
             const {store} = this.props;
-            const {todos, goals} = store.getState();
+            const {todos, goals,loading} = store.getState();
+
+            if(loading){
+                return (
+                    <div>
+                        <h1>ToDo & Goal APP</h1>
+                        <img src="loader.gif"/>
+                    </div>
+
+                );
+            }
 
             return (<div>
                 <h1>ToDo & Goal APP</h1>
@@ -206,24 +260,39 @@
     //Uncontrolled component
     class ToDo extends React.Component {
 
-        removeItem = (id) => {
-            this.props.store.dispatch(removeTodoAction(id));
+        removeItem = (item) => {
+            this.props.store.dispatch(removeTodoAction(item.id));
+
+            return API.deleteTodo(item.id).catch(()=>{
+                alert(`Something went wrong:
+                       Unable to DELETE: ${item.name}`);
+                this.props.store.dispatch(addTodoAction(item));
+            })
+
         };
 
         toggleItem = (id) => {
-            console.log('ID', id)
             this.props.store.dispatch(toggleTodoAction(id));
+
+            return API.saveTodoToggle(id).catch(()=>{
+                alert('ERROR: Try again');
+                this.props.store.dispatch(toggleTodoAction(id));
+            });
         };
 
         addItem = (event) => {
             event.preventDefault();
             const name = this.input.value;
-            this.props.store.dispatch(addTodoAction({
-                input: name,
-                complete: false,
-                id: generateId()
-            }));
-            this.input.value = '';
+
+            return API.saveTodo(name).then((todo)=>{
+                this.props.store.dispatch(addTodoAction(todo));
+                this.input.value = '';
+            }).catch(()=>{
+                alert('ToDo did not saved')
+            });
+
+
+
         };
 
         render() {
@@ -236,7 +305,11 @@
                         ref={(input) => this.input = input}
                     />
                     <button onClick={this.addItem}>Add ToDo</button>
-                    <List toggleItem={this.toggleItem} removeItem={this.removeItem} items={this.props.todos}/>
+                    <List
+                        toggleItem={this.toggleItem}
+                        removeItem={this.removeItem}
+                        items={this.props.todos}
+                    />
                 </div>);
         }
     }
@@ -245,19 +318,29 @@
     class Goal extends React.Component {
 
 
-        removeItem = (id) => {
-            this.props.store.dispatch(removeGoalAction(id));
+        removeItem = (item) => {
+            this.props.store.dispatch(removeGoalAction(item.id));
+
+            return API.deleteGoal(item.id).catch(()=>{
+                alert('Something went wrong');
+                this.props.store.dispatch(addGoalAction(item));
+            })
+
+
         };
 
         addGoal = (event) => {
             event.preventDefault();
-            const goal = this.goal.value;
-            this.props.store.dispatch(addGoalAction({
-                input: goal,
-                id: generateId()
-            }));
+            const name = this.goal.value;
 
-            this.goal.value = '';
+            return API.saveGoal(name).then((goal)=>{
+                this.props.store.dispatch(addGoalAction(goal));
+                this.goal.value = '';
+            }).catch((error)=>{
+                alert(`ERROR: ${error.toString()}`);
+            });
+
+
         };
 
         render() {
@@ -283,9 +366,9 @@
                     <div key={item.id}>
                         <li>
                             <span onClick={() => props.toggleItem && props.toggleItem(item.id)}
-                                  style={{textDecoration: item.complete ? 'line-through' : 'none'}}>{item.input}</span>
+                                  style={{textDecoration: item.complete ? 'line-through' : 'none'}}>{item.name}xxx</span>
                             <button
-                                onClick={() => props.removeItem(item.id)}>X
+                                onClick={() => props.removeItem(item)}>X
                             </button>
                         </li>
                     </div>
