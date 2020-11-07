@@ -91,6 +91,29 @@
 
         };*/
 
+
+       //Action creator App
+
+        function asyncReceivedDataAction(){
+            const {fetchTodos, fetchGoals,} = API;
+            return (dispatch)=>{
+
+                try{
+                    Promise.all([fetchTodos(),fetchGoals()])
+                        .then(([todos,goals])=>{
+                            dispatch(receiveDataAction(todos,goals));
+                            this.setState({
+                                isLoader:false
+                            })
+                        });
+
+                }catch(error){
+                    console.log(error);
+                }
+            }
+
+        }
+
         /**
          * Action Creators: ToDO List
          * */
@@ -145,10 +168,11 @@
             }
         }
 
-        function asyncAddItem(name){
+        function asyncAddItem(name,fn){
             return (dispatch)=>{
                 return API.saveTodo(name).then((todo)=>{
                     dispatch(addTodoAction(todo));
+                    fn();
                 }).catch(()=>{
                     alert('ToDo did not saved')
                 });
@@ -169,6 +193,28 @@
             return {
                 type: REMOVE_GOAL,
                 id,
+            }
+        }
+
+        function asyncRemoveGoalAction(item){
+            return (dispatch)=>{
+                dispatch(removeGoalAction(item.id));
+
+                return API.deleteGoal(item.id).catch(()=>{
+                    alert('Something went wrong');
+                    dispatch(addGoalAction(item));
+                })
+            }
+        }
+
+        function asyncAddGoalAction(name,fn){
+            return (dispatch)=>{
+                return API.saveGoal(name).then((goal)=>{
+                    dispatch(addGoalAction(goal));
+                    fn();
+                }).catch((error)=>{
+                    alert(`ERROR: ${error.toString()}`);
+                });
             }
         }
 
@@ -254,21 +300,8 @@
     class App extends React.Component {
 
        componentDidMount() {
-            const {fetchTodos, fetchGoals,} = API;
            const {store} = this.props;
-
-          try{
-              Promise.all([fetchTodos(),fetchGoals()])
-                  .then(([todos,goals])=>{
-                      store.dispatch(receiveDataAction(todos,goals));
-                      this.setState({
-                          isLoader:false
-                      })
-                  });
-
-          }catch(error){
-              console.log(error);
-          }
+           store.dispatch(asyncReceivedDataAction())
 
            store.subscribe(() => this.forceUpdate());
         }
@@ -314,8 +347,8 @@
 
             event.preventDefault();
             const name = this.input.value;
-            this.props.store.dispatch(asyncAddItem(name));
-            this.input.value = '';
+            this.props.store.dispatch(asyncAddItem(name,()=>this.input.value=''));
+
 
         };
 
@@ -343,27 +376,13 @@
 
 
         removeItem = (item) => {
-            this.props.store.dispatch(removeGoalAction(item.id));
-
-            return API.deleteGoal(item.id).catch(()=>{
-                alert('Something went wrong');
-                this.props.store.dispatch(addGoalAction(item));
-            })
-
-
+            this.props.store.dispatch(asyncRemoveGoalAction(item));
         };
 
         addGoal = (event) => {
             event.preventDefault();
             const name = this.goal.value;
-
-            return API.saveGoal(name).then((goal)=>{
-                this.props.store.dispatch(addGoalAction(goal));
-                this.goal.value = '';
-            }).catch((error)=>{
-                alert(`ERROR: ${error.toString()}`);
-            });
-
+            this.props.store.dispatch(asyncAddGoalAction(name,()=>this.goal.value=''));
 
         };
 
