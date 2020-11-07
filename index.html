@@ -11,6 +11,7 @@
     <script src="https://unpkg.com/babel-standalone@6.15.0/babel.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/redux/3.7.2/redux.min.js"></script>
     <script src="https://tylermcginnis.com/goals-todos-api/index.js"></script>
+    <script src="https://unpkg.com/redux-thunk@2.2.0/dist/redux-thunk.min.js"></script>
     <script>
 
         // Action types
@@ -80,6 +81,16 @@
             next(action);
         };
 
+       /* const thunk = (store) => (next)=>(action)=> {
+            console.log(typeof action);
+            if(typeof action === 'function'){
+                return action(store.dispatch);
+            }
+
+            return next(action);
+
+        };*/
+
         /**
          * Action Creators: ToDO List
          * */
@@ -113,6 +124,36 @@
             }
         }
 
+        function asyncRemoveTodoAction(item){
+            return (dispatch) => {
+                dispatch(removeTodoAction(item.id));
+                return API.deleteTodo(item.id).catch(()=>{
+                    alert(`Something went wrong:
+                       Unable to DELETE: ${item.name}`);
+                    dispatch(addTodoAction(item));
+                })
+            };
+        }
+
+        function asynToggleAction(id){
+            return (dispatch)=>{
+                dispatch(toggleTodoAction(id));
+                return API.saveTodoToggle(id).catch(()=>{
+                    alert('ERROR: Try again');
+                   dispatch(toggleTodoAction(id));
+                });
+            }
+        }
+
+        function asyncAddItem(name){
+            return (dispatch)=>{
+                return API.saveTodo(name).then((todo)=>{
+                    dispatch(addTodoAction(todo));
+                }).catch(()=>{
+                    alert('ToDo did not saved')
+                });
+            }
+        }
 
         /**
          * Action creators: goal
@@ -189,7 +230,7 @@
                 goals,
                 loading,
             }),
-            Redux.applyMiddleware(checker, logger, goal, dontforget)
+            Redux.applyMiddleware(ReduxThunk.default,checker, logger, goal, dontforget)
         );
 
         addGoal = () => {
@@ -261,37 +302,20 @@
     class ToDo extends React.Component {
 
         removeItem = (item) => {
-            this.props.store.dispatch(removeTodoAction(item.id));
-
-            return API.deleteTodo(item.id).catch(()=>{
-                alert(`Something went wrong:
-                       Unable to DELETE: ${item.name}`);
-                this.props.store.dispatch(addTodoAction(item));
-            })
-
+            this.props.store.dispatch(asyncRemoveTodoAction(item));
         };
 
         toggleItem = (id) => {
-            this.props.store.dispatch(toggleTodoAction(id));
-
-            return API.saveTodoToggle(id).catch(()=>{
-                alert('ERROR: Try again');
-                this.props.store.dispatch(toggleTodoAction(id));
-            });
+            this.props.store.dispatch(asynToggleAction(id));
         };
 
         addItem = (event) => {
+
+
             event.preventDefault();
             const name = this.input.value;
-
-            return API.saveTodo(name).then((todo)=>{
-                this.props.store.dispatch(addTodoAction(todo));
-                this.input.value = '';
-            }).catch(()=>{
-                alert('ToDo did not saved')
-            });
-
-
+            this.props.store.dispatch(asyncAddItem(name));
+            this.input.value = '';
 
         };
 
